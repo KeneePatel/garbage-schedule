@@ -107,7 +107,6 @@ export default function Home() {
           >
             <div className="flex items-center gap-4">
               <Avatar className="w-10 h-10 rounded-full text-primary">
-                <AvatarImage src="/placeholder-user.jpg" alt={roommate.name} />
                 <AvatarFallback>
                   {roommate.name.charAt(0).toUpperCase()}
                 </AvatarFallback>
