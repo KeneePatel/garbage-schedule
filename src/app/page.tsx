@@ -1,10 +1,12 @@
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import supabase from "@/lib/supabase-client";
 import { Trash2Icon } from "lucide-react";
-import { useState, KeyboardEvent } from "react";
+import { KeyboardEvent, useEffect, useState } from "react";
 
 type Roommate = {
   id: number;
@@ -13,23 +15,74 @@ type Roommate = {
 
 export default function Home() {
   const [roommates, setRoommates] = useState<Roommate[]>([]);
-  const [turnIndex, setTurnIndex] = useState(0);
+  const [turnIndex, setTurnIndex] = useState<number>(0);
 
-  const addRoommate = (name: string) => {
-    const newRoommate: Roommate = { id: roommates.length, name };
-    setRoommates([...roommates, newRoommate]);
+  useEffect(() => {
+    fetchRoommates();
+    fetchTurnIndex();
+  }, []);
+
+  const fetchRoommates = async () => {
+    const { data, error } = await supabase
+      .from("roommates")
+      .select("*")
+      .order("id");
+
+    if (error) console.error("Error fetching roommates:", error);
+    else setRoommates(data || []);
   };
 
-  const removeRoommate = (id: number) => {
-    const updatedRoommates = roommates.filter((roommate) => roommate.id !== id);
-    setRoommates(updatedRoommates);
-    if (turnIndex >= updatedRoommates.length) {
-      setTurnIndex(0);
+  const fetchTurnIndex = async () => {
+    const { data, error } = await supabase
+      .from("rotation_state")
+      .select("turn_index")
+      .single();
+
+    if (error) console.error("Error fetching turn index:", error);
+    else if (data) setTurnIndex(data.turn_index);
+  };
+
+  const updateTurnIndex = async (index: number) => {
+    const { data, error } = await supabase
+      .from("rotation_state")
+      .update({ turn_index: index })
+      .match({ id: 1 }); // Assuming only one row with id=1
+
+    if (error) console.error("Error updating turn index:", error);
+  };
+
+  const addRoommate = async (name: string) => {
+    const { error } = await supabase
+      .from("roommates")
+      .insert([{ name }])
+      .single();
+
+    if (error) console.error("Error adding roommate:", error);
+    else fetchRoommates();
+  };
+
+  const removeRoommate = async (id: number) => {
+    const { error } = await supabase.from("roommates").delete().eq("id", id);
+
+    if (error) console.error("Error removing roommate:", error);
+    else {
+      const updatedRoommates = roommates.filter(
+        (roommate) => roommate.id !== id,
+      );
+      setRoommates(updatedRoommates);
+      if (turnIndex >= updatedRoommates.length) {
+        setTurnIndex(0);
+        updateTurnIndex(0);
+      }
     }
   };
 
   const nextTurn = () => {
-    setTurnIndex((turnIndex + 1) % roommates.length);
+    setTurnIndex((prevTurnIndex) => {
+      const newIndex = (prevTurnIndex + 1) % roommates.length;
+      updateTurnIndex(newIndex);
+      return newIndex;
+    });
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -43,11 +96,11 @@ export default function Home() {
     <div className="max-w-md mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Garbage Duty Roster</h1>
       <ul className="space-y-2">
-        {roommates.map((roommate) => (
+        {roommates.map((roommate, index) => (
           <li
-            key={roommate.id}
+            key={index}
             className={`flex items-center justify-between p-4 rounded-lg shadow-md ${
-              roommate.id === turnIndex
+              index === turnIndex
                 ? "bg-secondary-foreground text-secondary"
                 : "bg-background"
             }`}
@@ -60,6 +113,9 @@ export default function Home() {
                 </AvatarFallback>
               </Avatar>
               <span className="font-medium">{roommate.name}</span>
+              {index === turnIndex && (
+                <Badge className="bg-green-600">On duty</Badge>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button
