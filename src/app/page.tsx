@@ -32,6 +32,13 @@ export default function Home() {
   const [turnIndex, setTurnIndex] = useState<number>(0);
 
   useEffect(() => {
+    const storedPassword = localStorage.getItem("storedPassword");
+    if (
+      storedPassword &&
+      compareSync(storedPassword, process.env.NEXT_PUBLIC_PASSWORD_HASH!)
+    ) {
+      setPasswordConfirmed(true);
+    }
     fetchRoommates();
     fetchTurnIndex();
   }, []);
@@ -107,9 +114,8 @@ export default function Home() {
   };
 
   const onSubmit = () => {
-    const salt = genSaltSync(Number(process.env.NEXT_PUBLIC_PASSWORD_SALT));
-    const hash = hashSync(currentPassword, salt);
     if (compareSync(currentPassword, process.env.NEXT_PUBLIC_PASSWORD_HASH!)) {
+      localStorage.setItem("storedPassword", currentPassword);
       toast({
         title: "Ayo",
         description: "Welcome",
@@ -120,7 +126,6 @@ export default function Home() {
         title: "Password Incorrect",
         description: "Feel free to try again :)",
       });
-      console.debug(`salt: ${salt}, hash: ${hash}`);
     }
   };
 
